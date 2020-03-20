@@ -10,6 +10,8 @@ const genres = ['Entertainment', 'News', 'Sports', 'Kids']
 
 const addonHost = 'https://ustvgo.now.sh'
 
+const evl = require('eval')
+
 const manifest = { 
     id: 'org.stremio.usiptvgo',
     version: '1.0.2',
@@ -141,15 +143,25 @@ builder.defineStreamHandler(args => {
                     if (part.includes("'")) {
                         const part2 = part.split("'")[0]
                         getBody('https://ustvgo.tv/player.php?stream=' + part2).then(body => {
-                            const part3 = body.split(' file: ')[1]
-                            if (part3.includes(',')) {
-                                const part4 = part3.split(',')[0].split("'").join('')
-                                if (part4)
-                                    resolve({ streams: [{ title: 'Stream', url: proxy.addProxy(part4, opts) }], cacheMaxAge: 60 * 60 }) // 60 min cache
-                                else
-                                    reject('parse error 7')
+                            let scriptPart = body.match(/<script type="text\/javascript">[^<]+<\/script>/gm)
+                            let tokenPart = body.match(/document\.getElementById\("[^"]+"\)\.innerHTML/gm)
+                            if (scriptPart.length && tokenPart.length) {
+                                tokenPart = tokenPart[0].replace('document.getElementById("', '').replace('").innerHTML', '')
+                                const tokenRegex = new RegExp("<span style='display:none' id="+tokenPart+">[^<]+", 'g')
+                                let resolvedToken = body.match(tokenRegex)
+                                if (resolvedToken.length) {
+                                    resolvedToken = resolvedToken[0].replace("<span style='display:none' id="+tokenPart+">", '')
+                                    scriptPart = scriptPart[0].replace('document.getElementById("'+tokenPart+'").innerHTML', '"' + resolvedToken + '"').replace('<script type="text\/javascript">', '').replace('<\/script>', '')
+                                    scriptPart = 'function something() { var url = false; var jwplayer = () => { return { setup: obj => { url = obj.file } } }; ' + scriptPart + ' return url }; something();'
+                                    evl(scriptPart).then(resp => {
+                                      resolve({ streams: [{ title: 'Stream', url: proxy.addProxy(resp, opts) }], cacheMaxAge: 60 * 60 }) // 60 min cache
+                                    }).catch(err => {
+                                      reject('parse error 8')
+                                    })
+                                } else
+                                  reject('parse error 7')
                             } else
-                                reject('parse error 6')
+                                  reject('parse error 6')
                         }).catch(err => {
                             console.error(err)
                             reject(err)
@@ -161,15 +173,25 @@ builder.defineStreamHandler(args => {
                     if (part.includes('"')) {
                         const part2 = part.split('"')[0]
                         getBody('https://ustvgo.tv/player2.php?stream=' + part2).then(body => {
-                            const part3 = body.split(' file: ')[1]
-                            if (part3.includes(',')) {
-                                const part4 = part3.split(',')[0].split("'").join('')
-                                if (part4)
-                                    resolve({ streams: [{ title: 'Stream', url: proxy.addProxy(part4, opts) }], cacheMaxAge: 60 * 60 }) // 60 min cache
-                                else
-                                    reject('parse error 12')
+                            let scriptPart = body.match(/<script type="text\/javascript">[^<]+<\/script>/gm)
+                            let tokenPart = body.match(/document\.getElementById\("[^"]+"\)\.innerHTML/gm)
+                            if (scriptPart.length && tokenPart.length) {
+                                tokenPart = tokenPart[0].replace('document.getElementById("', '').replace('").innerHTML', '')
+                                const tokenRegex = new RegExp("<span style='display:none' id="+tokenPart+">[^<]+", 'g')
+                                let resolvedToken = body.match(tokenRegex)
+                                if (resolvedToken.length) {
+                                    resolvedToken = resolvedToken[0].replace("<span style='display:none' id="+tokenPart+">", '')
+                                    scriptPart = scriptPart[0].replace('document.getElementById("'+tokenPart+'").innerHTML', '"' + resolvedToken + '"').replace('<script type="text\/javascript">', '').replace('<\/script>', '')
+                                    scriptPart = 'function something() { var url = false; var jwplayer = () => { return { setup: obj => { url = obj.file } } }; ' + scriptPart + ' return url }; something();'
+                                    evl(scriptPart).then(resp => {
+                                      resolve({ streams: [{ title: 'Stream', url: proxy.addProxy(resp, opts) }], cacheMaxAge: 60 * 60 }) // 60 min cache
+                                    }).catch(err => {
+                                      reject('parse error 13')
+                                    })
+                                } else
+                                  reject('parse error 12')
                             } else
-                                reject('parse error 11')
+                                  reject('parse error 11')
                         }).catch(err => {
                             console.error(err)
                             reject(err)
